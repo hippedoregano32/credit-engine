@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Private Credit Underwriting Engine</title>
+<style>
+  :root{
+    --bg:#0c1118; --panel:#141b26; --panel2:#1b2533; --line:#26303f;
+    --txt:#e6edf5; --muted:#8a99ad; --accent:#36c2a8; --accent2:#4f8cff;
+    --good:#33c27f; --warn:#e8b13a; --bad:#e5575f; --chip:#212c3b;
+    --radius:10px; --mono:'SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:14px;line-height:1.45}
+  a{color:var(--accent2)}
+  header{padding:18px 26px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#10171f,#0c1118)}
+  header h1{font-size:18px;margin:0;letter-spacing:.3px}
+  header .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
+  .badge{font-size:11px;color:var(--muted);border:1px solid var(--line);padding:4px 9px;border-radius:20px}
+  .wrap{display:grid;grid-template-columns:430px 1fr;gap:0;min-height:calc(100vh - 70px)}
+  .inputs{border-right:1px solid var(--line);background:var(--panel);overflow-y:auto;max-height:calc(100vh - 70px)}
+  .tabs{display:flex;flex-wrap:wrap;gap:2px;padding:10px 12px 0;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:5}
+  .tab{font-size:12px;padding:7px 11px;border-radius:7px 7px 0 0;color:var(--muted);cursor:pointer;border:1px solid transparent;border-bottom:none}
+  .tab:hover{color:var(--txt)}
+  .tab.active{color:var(--txt);background:var(--panel2);border-color:var(--line)}
+  .tabpane{display:none;padding:16px 18px}
+  .tabpane.active{display:block}
+  .grp{margin-bottom:18px}
+  .grp h3{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);margin:0 0 10px}
+  .row{display:grid;grid-template-columns:1fr 110px;align-items:center;gap:8px;margin-bottom:8px}
+  .row label{color:var(--muted);font-size:12.5px}
+  .row .hint{font-size:11px;color:#5d6b7e}
+  .crow{display:grid;grid-template-columns:1fr 130px;align-items:center;gap:8px;margin-bottom:8px}
+  .crow label{color:var(--muted);font-size:12.5px}
+  .cval{font-family:var(--mono);font-size:12.5px;text-align:right;color:var(--accent);
+    background:var(--panel2);border:1px dashed var(--line);border-radius:6px;padding:6px 8px;white-space:nowrap}
+  .computed-hd{display:flex;align-items:center;gap:7px;font-size:11px;color:#6b798c;margin:2px 0 10px}
+  .computed-hd .lk{font-size:10px;border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--muted);letter-spacing:.4px}
+  .cstack{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+  .cstack td{padding:6px 7px;border-bottom:1px solid var(--line)}
+  .cstack td:first-child{font-family:var(--sans);color:var(--muted)}
+  .cstack td:last-child{text-align:right}
+  .cstack tr:last-child td{border-bottom:none}
+  .cstack .loanrow td{color:var(--accent);font-weight:600}
+  .cstack .eqrow td{color:#8a99ad}
+  .cstack .cushrow td{color:var(--accent2);border-top:1px solid var(--line)}
+  input,select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--txt);
+    padding:6px 8px;border-radius:6px;font-family:var(--mono);font-size:12.5px;text-align:right}
+  select{text-align:left;font-family:var(--sans)}
+  input:focus,select:focus{outline:none;border-color:var(--accent2)}
+  .casehdr{display:grid;grid-template-columns:1fr 80px 80px 80px;gap:8px;font-size:11px;color:var(--muted);margin-bottom:6px}
+  .caserow{display:grid;grid-template-columns:1fr 80px 80px 80px;gap:8px;margin-bottom:7px;align-items:center}
+  .caserow label{font-size:12px;color:var(--muted)}
+  .caserow input{padding:5px 6px;font-size:12px}
+  .runbar{position:sticky;bottom:0;padding:14px 18px;background:linear-gradient(0deg,var(--panel),rgba(20,27,38,.6));border-top:1px solid var(--line)}
+  button.run{width:100%;background:linear-gradient(90deg,var(--accent),#2ea88f);color:#04231d;border:none;
+    padding:12px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;letter-spacing:.3px}
+  button.run:hover{filter:brightness(1.08)}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);padding:8px;border-radius:7px;cursor:pointer;width:100%;margin-top:8px;font-size:12px}
+  button.ghost:hover{color:var(--txt);border-color:var(--accent2)}
+  .results{overflow-y:auto;max-height:calc(100vh - 70px);padding:22px 26px 60px}
+  .recbanner{border-radius:12px;padding:20px 22px;margin-bottom:22px;border:1px solid var(--line)}
+  .recbanner .dec{font-size:23px;font-weight:800;letter-spacing:.3px}
+  .recbanner .why{margin-top:8px;color:var(--muted);font-size:13px;max-width:760px}
+  .rec-approve{background:linear-gradient(120deg,rgba(51,194,127,.16),rgba(51,194,127,.03));border-color:rgba(51,194,127,.4)}
+  .rec-approve .dec{color:var(--good)}
+  .rec-reprice{background:linear-gradient(120deg,rgba(232,177,58,.16),rgba(232,177,58,.03));border-color:rgba(232,177,58,.4)}
+  .rec-reprice .dec{color:var(--warn)}
+  .rec-reject{background:linear-gradient(120deg,rgba(229,87,95,.16),rgba(229,87,95,.03));border-color:rgba(229,87,95,.4)}
+  .rec-reject .dec{color:var(--bad)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+  .card .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+  .card .v{font-size:23px;font-weight:700;margin-top:6px;font-family:var(--mono)}
+  .card .s{font-size:11px;color:var(--muted);margin-top:3px}
+  .v.good{color:var(--good)} .v.warn{color:var(--warn)} .v.bad{color:var(--bad)}
+  section.block{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:20px}
+  section.block h2{font-size:13px;text-transform:uppercase;letter-spacing:.9px;color:var(--accent);margin:0 0 4px}
+  section.block .desc{color:var(--muted);font-size:12px;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px}
+  th,td{padding:7px 9px;text-align:right;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left;font-family:var(--sans)}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  tr:last-child td{border-bottom:none}
+  .tag{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-family:var(--sans);font-weight:600}
+  .tag.ok{background:rgba(51,194,127,.15);color:var(--good)}
+  .tag.no{background:rgba(229,87,95,.18);color:var(--bad)}
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:1100px){.twocol{grid-template-columns:1fr}.wrap{grid-template-columns:1fr}.inputs{max-height:none}}
+  ul.clean{margin:6px 0 0;padding-left:18px}
+  ul.clean li{margin-bottom:5px;color:var(--muted)}
+  ul.clean li b{color:var(--txt)}
+  .pill{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:5px;background:var(--chip)}
+  canvas{width:100%;height:auto;display:block}
+  .flow{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .flow .step{font-size:11px;color:var(--muted);background:var(--chip);padding:4px 8px;border-radius:5px}
+  .flow .step.done{color:var(--accent);border:1px solid rgba(54,194,168,.3)}
+  .note{font-size:11.5px;color:#5d6b7e;margin-top:10px;font-style:italic}
+  .legend{display:flex;gap:16px;font-size:11.5px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+  .legend span b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Private Credit Underwriting Engine</h1>
+    <div class="sub">Borrower → Structure → Projection → Monte Carlo → Loss → Pricing → IC Recommendation</div>
+  </div>
+  <div class="badge">end-to-end quant engine · runs locally</div>
+</header>
+
+<div class="wrap">
+  <!-- ============ INPUT PANEL ============ -->
+  <div class="inputs">
+    <div class="tabs">
+      <div class="tab active" data-tab="borrower">Borrower</div>
+      <div class="tab" data-tab="loan">Loan</div>
+      <div class="tab" data-tab="capstack">Cap Structure</div>
+      <div class="tab" data-tab="assump">Projection</div>
+      <div class="tab" data-tab="risk">Risk / Monte Carlo</div>
+      <div class="tab" data-tab="decision">Decision Rules</div>
+    </div>
+
+    <!-- Borrower financials -->
+    <div class="tabpane active" data-pane="borrower">
+      <div class="grp">
+        <h3>Borrower Financials ($M)</h3>
+        <div class="row"><label>Revenue</label><input id="revenue" value="200"></div>
+        <div class="row"><label>EBITDA</label><input id="ebitda" value="40"></div>
+        <div class="row"><label>Cash balance</label><input id="cash" value="15"></div>
+        <div class="row"><label>Existing debt</label><input id="existingDebt" value="100"></div>
+        <div class="row"><label>Existing interest expense</label><input id="existingInterest" value="6"></div>
+        <div class="row"><label>Capex</label><input id="capex0" value="8"></div>
+        <div class="row"><label>Tax rate (%)</label><input id="taxRate" value="25"></div>
+        <div class="row"><label>NWC (% of revenue)</label><input id="nwcPct" value="10"></div>
+        <div class="row"><label>Hist. revenue growth (%)</label><input id="histGrowth" value="4"></div>
+      </div>
+      <div class="grp">
+        <h3>Qualitative profile</h3>
+        <div class="row"><label>Industry risk</label>
+          <select id="industryRisk"><option value="1">Low</option><option value="2" selected>Medium</option><option value="3">High</option></select></div>
+        <div class="row"><label>Cyclicality</label>
+          <select id="cyclicality"><option value="1">Low</option><option value="2" selected>Medium</option><option value="3">High</option></select></div>
+        <div class="row"><label>Customer concentration</label>
+          <select id="custConc"><option value="1">Low</option><option value="2" selected>Medium</option><option value="3">High</option></select></div>
+        <div class="row"><label>Sponsor-backed</label>
+          <select id="sponsor"><option value="1" selected>Yes</option><option value="0">No</option></select></div>
+      </div>
+    </div>
+
+    <!-- Proposed loan terms -->
+    <div class="tabpane" data-pane="loan">
+      <div class="grp">
+        <h3>Proposed Loan Terms</h3>
+        <div class="row"><label>Loan amount ($M)</label><input id="loanAmount" value="100"></div>
+        <div class="row"><label>Base rate / SOFR (%)</label><input id="baseRate" value="4.5"></div>
+        <div class="row"><label>Spread (bps over base)</label><input id="spread" value="600"></div>
+        <div class="row"><label>Maturity (years)</label><input id="maturity" value="5"></div>
+        <div class="row"><label>Amortization (% / yr)</label><input id="amortPct" value="1"></div>
+        <div class="row"><label>Upfront fee (%)</label><input id="upfrontFee" value="2"></div>
+        <div class="row"><label>Exit fee (%)</label><input id="exitFee" value="1"></div>
+        <div class="row"><label>PIK interest (% of coupon)</label><input id="pikPct" value="0"></div>
+        <div class="row"><label>Seniority</label>
+          <select id="seniority"><option value="first" selected>First lien (senior secured)</option><option value="second">Second lien</option></select></div>
+      </div>
+      <div class="grp">
+        <div class="computed-hd"><span class="lk">🔒 COMPUTED</span> derived from your inputs — not editable</div>
+        <div class="crow"><label>All-in cash coupon (base + spread)</label><span class="cval" id="dispCoupon">—</span></div>
+        <div class="crow"><label>Spread</label><span class="cval" id="dispSpread">—</span></div>
+        <div class="crow"><label>Net funded at close (loan − upfront fee)</label><span class="cval" id="dispNetFunded">—</span></div>
+      </div>
+    </div>
+
+    <!-- Capital structure -->
+    <div class="tabpane" data-pane="capstack">
+      <div class="grp">
+        <h3>Capital Structure ($M)</h3>
+        <div class="row"><label>Enterprise value (going concern)</label><input id="ev" value="280"></div>
+        <div class="row"><label>Distressed EV multiple (x EBITDA)</label><input id="distMult" value="5.0"></div>
+        <div class="row"><label>Other pari-passu senior debt</label><input id="pariSenior" value="0"></div>
+        <div class="row"><label>Junior / subordinated debt</label><input id="juniorDebt" value="75"></div>
+        <div class="row"><label>Preferred equity</label><input id="preferred" value="25"></div>
+      </div>
+      <div class="grp">
+        <div class="computed-hd"><span class="lk">🔒 COMPUTED</span> capital stack assembled from your inputs — not editable</div>
+        <table class="cstack" id="cstackTbl"></table>
+      </div>
+      <div class="note">Recovery in default is computed by a priority waterfall on distressed enterprise value (EBITDA × distressed multiple). The proposed loan recovers at its lien-class rate.</div>
+    </div>
+
+    <!-- Projection assumptions -->
+    <div class="tabpane" data-pane="assump">
+      <div class="grp">
+        <h3>Scenario Assumptions</h3>
+        <div class="casehdr"><span></span><span>Upside</span><span>Base</span><span>Down</span></div>
+        <div class="caserow"><label>Revenue growth %</label><input id="g_up" value="8"><input id="g_base" value="4"><input id="g_dn" value="-3"></div>
+        <div class="caserow"><label>EBITDA margin %</label><input id="m_up" value="24"><input id="m_base" value="21"><input id="m_dn" value="17"></div>
+        <div class="caserow"><label>Capex % of rev</label><input id="cx_up" value="3"><input id="cx_base" value="4"><input id="cx_dn" value="5"></div>
+        <div class="caserow"><label>Exit multiple x</label><input id="ex_up" value="8.0"><input id="ex_base" value="7.0"><input id="ex_dn" value="5.5"></div>
+      </div>
+      <div class="note">Base-case assumptions also set the central tendency for the Monte Carlo simulation.</div>
+    </div>
+
+    <!-- Risk / Monte Carlo -->
+    <div class="tabpane" data-pane="risk">
+      <div class="grp">
+        <h3>Covenant Thresholds</h3>
+        <div class="row"><label>Max leverage (Debt/EBITDA)</label><input id="covLev" value="5.5"></div>
+        <div class="row"><label>Min interest coverage</label><input id="covCov" value="2.0"></div>
+        <div class="row"><label>Min liquidity ($M)</label><input id="covLiq" value="10"></div>
+        <div class="row"><label>Min DSCR</label><input id="covDSCR" value="1.25"></div>
+      </div>
+      <div class="grp">
+        <h3>Simulation Parameters</h3>
+        <div class="row"><label>Number of paths</label><input id="numSims" value="10000"></div>
+        <div class="row"><label>Revenue growth vol (%)</label><input id="revVol" value="6"></div>
+        <div class="row"><label>EBITDA margin vol (%)</label><input id="marginVol" value="3"></div>
+        <div class="row"><label>Base rate vol (%)</label><input id="rateVol" value="1"></div>
+        <div class="row"><label>Growth↔margin correlation</label><input id="corr" value="0.4"></div>
+      </div>
+      <div class="grp">
+        <h3>Default Triggers</h3>
+        <div class="row"><label>Interest coverage below</label><input id="dtCov" value="1.0"></div>
+        <div class="row"><label>Leverage above</label><input id="dtLev" value="7.0"></div>
+        <div class="row"><label>DSCR below</label><input id="dtDSCR" value="1.0"></div>
+        <div class="row"><label>Min cash floor ($M)</label><input id="dtCash" value="0"></div>
+        <div class="row"><label>Breach persists ≥ (yrs)</label><input id="breachPersist" value="2"></div>
+      </div>
+    </div>
+
+    <!-- Decision rules -->
+    <div class="tabpane" data-pane="decision">
+      <div class="grp">
+        <h3>Pricing Inputs</h3>
+        <div class="row"><label>Target return / hurdle IRR (%)</label><input id="targetIRR" value="12"></div>
+        <div class="row"><label>Target excess return (%)</label><input id="targetExcess" value="4"></div>
+        <div class="row"><label>Liquidity premium (%)</label><input id="liqPrem" value="1"></div>
+        <div class="row"><label>Risk buffer (%)</label><input id="riskBuffer" value="0.5"></div>
+      </div>
+      <div class="grp">
+        <h3>Approve Thresholds</h3>
+        <div class="row"><label>Max PD for approve (%)</label><input id="appPD" value="10"></div>
+        <div class="row"><label>Max expected loss (%)</label><input id="appEL" value="4"></div>
+        <div class="row"><label>Min downside recovery (%)</label><input id="appRec" value="60"></div>
+        <div class="row"><label>Max breach probability (%)</label><input id="appBreach" value="25"></div>
+      </div>
+      <div class="note">Reject thresholds (hard limits): PD &gt; 25%, expected loss &gt; 8%, recovery &lt; 40%, or interest coverage &lt; 1.25x.</div>
+    </div>
+
+    <div class="runbar">
+      <button class="run" id="runBtn">▶ Run Underwriting Analysis</button>
+      <button class="ghost" id="resetBtn">Reset to example borrower</button>
+    </div>
+  </div>
+
+  <!-- ============ RESULTS PANEL ============ -->
+  <div class="results" id="results"></div>
+</div>
+
+<script>
+/* =========================================================================
+   PRIVATE CREDIT UNDERWRITING ENGINE
+   A self-contained quant engine. Each section below is one stage of the pipeline.
+   ========================================================================= */
+
+/* ---------- small helpers ---------- */
+const $ = id => document.getElementById(id);
+const N = id => parseFloat($(id).value) || 0;
+const fmtP = (x,d=1)=> (isFinite(x)? (x*100).toFixed(d):'–')+'%';
+const fmt$ = x => (x<0?'-$':'$')+Math.abs(x).toFixed(1)+'M';
+const fmtX = x => isFinite(x)? x.toFixed(2)+'x' : '–';
+const clamp = (x,a,b)=> Math.max(a,Math.min(b,x));
+
+/* Box–Muller standard normal */
+let _spare=null;
+function randn(){
+  if(_spare!==null){const s=_spare;_spare=null;return s;}
+  let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random();
+  const mag=Math.sqrt(-2*Math.log(u));
+  _spare=mag*Math.sin(2*Math.PI*v);
+  return mag*Math.cos(2*Math.PI*v);
+}
+
+/* IRR by bracketed bisection — robust for distressed cash flows */
+function irr(cfs){
+  const npv=r=>cfs.reduce((s,c,t)=>s+c/Math.pow(1+r,t),0);
+  let lo=-0.9999, hi=1.0, flo=npv(lo), fhi=npv(hi), tries=0;
+  while(flo*fhi>0 && tries<80){ hi*=1.4; fhi=npv(hi); tries++; if(hi>1e7)break; }
+  if(flo*fhi>0) return flo>0? hi : lo;          // no sign change → clamp
+  for(let i=0;i<200;i++){
+    const mid=(lo+hi)/2, fm=npv(mid);
+    if(Math.abs(fm)<1e-9) return mid;
+    if(flo*fm<0){ hi=mid; } else { lo=mid; flo=fm; }
+  }
+  return (lo+hi)/2;
+}
+function moic(cfs){
+  let inflow=0, outflow=0;
+  cfs.forEach(c=> c>=0 ? inflow+=c : outflow-=c);
+  return outflow>0? inflow/outflow : NaN;
+}
+function percentile(sorted,p){
+  if(!sorted.length) return NaN;
+  const i=(sorted.length-1)*p, lo=Math.floor(i), hi=Math.ceil(i);
+  return lo===hi? sorted[lo] : sorted[lo]+(sorted[hi]-sorted[lo])*(i-lo);
+}
+function mean(a){ return a.reduce((s,x)=>s+x,0)/a.length; }
+
+/* =========================================================================
+   CAPITAL STRUCTURE WATERFALL
+   Distribute (distressed) enterprise value by priority; loan recovers at
+   its lien-class rate.
+   ========================================================================= */
+function buildTranches(ctx){
+  const t=[];
+  if(ctx.seniority==='first'){
+    t.push({name:'First lien (incl. proposed loan)', amount: ctx.loanAmount+ctx.pariSenior, isLoan:true});
+    t.push({name:'Junior / subordinated debt', amount: ctx.juniorDebt, isLoan:false});
+  }else{
+    t.push({name:'First lien (existing senior)', amount: ctx.pariSenior, isLoan:false});
+    t.push({name:'Second lien (proposed loan)', amount: ctx.loanAmount, isLoan:true});
+    t.push({name:'Junior / subordinated debt', amount: ctx.juniorDebt, isLoan:false});
+  }
+  t.push({name:'Preferred equity', amount: ctx.preferred, isLoan:false});
+  return t;
+}
+function runWaterfall(ev, tranches){
+  let remaining=ev, loanRec=0;
+  const rows=tranches.map(tr=>{
+    const paid=Math.min(remaining, Math.max(0,tr.amount));
+    remaining-=paid;
+    const rec= tr.amount>0? paid/tr.amount : 1;
+    if(tr.isLoan) loanRec=rec;
+    return Object.assign({},tr,{paid, rec});
+  });
+  return {rows, loanRecovery:loanRec, residualEquity:Math.max(0,remaining)};
+}
+
+/* =========================================================================
+   SINGLE PATH ENGINE
+   Projects one future, tests covenants + default triggers, computes recovery
+   and the lender's realized cash flows / IRR. Used both for deterministic
+   deterministic scenarios and Monte Carlo draws.
+   growthSeq / marginSeq / rateSeq are per-year realizations (decimals).
+   ========================================================================= */
+function runPath(ctx, growthSeq, marginSeq, capexPct, rateSeq){
+  const yrs=ctx.maturity;
+  let rev=ctx.revenue, prevRev=ctx.revenue, cash=ctx.cash;
+  let loanBal=ctx.loanAmount, totalDebt=ctx.existingDebt+ctx.loanAmount;
+  const amort=ctx.amortPct*ctx.loanAmount;
+  const exitFee$=ctx.exitFee*ctx.loanAmount;
+  const lenderCF=[-(ctx.loanAmount - ctx.upfrontFee*ctx.loanAmount)];   // t0 outflow net of upfront fee
+  const tranches=buildTranches(ctx);
+  const metrics=[];
+  let defaulted=false, defaultYear=0, breached=false, breachYear=0;
+  let consec=0, recoveryRate=null, eadFrac=0;
+
+  for(let y=1;y<=yrs;y++){
+    const g=growthSeq[y-1], margin=clamp(marginSeq[y-1],0.02,0.6), baseR=Math.max(0,rateSeq[y-1]);
+    const loanBalBegin=loanBal;
+    rev=rev*(1+g);
+    const ebitda=rev*margin;
+    const couponRate=baseR+ctx.spread;
+    const pikRate=couponRate*ctx.pikPct;
+    const cashCoupon=loanBalBegin*(couponRate-pikRate);
+    const interest=ctx.existingInterest + loanBalBegin*couponRate;   // borrower cash interest burden
+    const capex=rev*capexPct;
+    const dna=capex;                                                 // approx D&A ≈ capex (steady state)
+    const dNWC=(rev-prevRev)*ctx.nwcPct;
+    const taxes=Math.max(0,(ebitda-dna-interest))*ctx.taxRate;
+    const cfads=ebitda-taxes-capex-dNWC;                             // cash available for debt service
+    const fcf=cfads-interest;
+
+    // PIK accretes principal before amortization
+    loanBal+=loanBalBegin*pikRate;
+    const amY=Math.min(amort,loanBal);
+    loanBal-=amY; totalDebt=Math.max(0,totalDebt-amY);
+    cash+=fcf-amY;
+    prevRev=rev;
+
+    const lev= ebitda>0? totalDebt/ebitda : 99;
+    const cov= interest>0? ebitda/interest : 99;
+    const dscr=(interest+amY)>0? cfads/(interest+amY) : 99;
+    metrics.push({y, rev, ebitda, interest, capex, fcf, cash, totalDebt, lev, cov, dscr});
+
+    const breach= lev>ctx.covLev || cov<ctx.covCov || cash<ctx.covLiq || dscr<ctx.covDSCR;
+    if(breach){ if(!breached){breached=true; breachYear=y;} consec++; } else consec=0;
+
+    const trigger= cash<ctx.dtCash || cov<ctx.dtCov || lev>ctx.dtLev || dscr<ctx.dtDSCR || consec>=ctx.breachPersist;
+
+    if(trigger && !defaulted){
+      defaulted=true; defaultYear=y;
+      const distressedEV=Math.max(0, ebitda*ctx.distMult);
+      // exposure at default = beginning balance for the year of default
+      const tr2=buildTranches(Object.assign({},ctx,{loanAmount:loanBalBegin}));
+      const wf=runWaterfall(distressedEV, tr2);
+      recoveryRate=wf.loanRecovery;
+      eadFrac=loanBalBegin/ctx.loanAmount;
+      lenderCF.push(recoveryRate*loanBalBegin);   // recovery, no coupon in default year
+      break;
+    }
+    let cf=cashCoupon+amY;
+    if(y===yrs) cf+=loanBal+exitFee$;             // bullet repayment of residual principal + exit fee
+    lenderCF.push(cf);
+  }
+
+  const r=irr(lenderCF);
+  const m=moic(lenderCF);
+  const lossFrac= defaulted? (1-recoveryRate)*eadFrac : 0;
+  return {defaulted, defaultYear, breached, breachYear, recoveryRate, lossFrac,
+          irr:r, moic:m, metrics, lenderCF};
+}
+
+/* =========================================================================
+   FINANCIAL RATIOS (period 0)
+   ========================================================================= */
+function ratios(ctx){
+  const coupon=ctx.baseRate+ctx.spread;
+  const proFormaInterest=ctx.existingInterest + ctx.loanAmount*coupon;
+  const totalDebt=ctx.existingDebt+ctx.loanAmount;
+  const ebitda=ctx.ebitda;
+  const dNWC=0;
+  const taxes=Math.max(0,(ebitda-ctx.capex0-proFormaInterest))*ctx.taxRate;
+  const fcf=ebitda-proFormaInterest-taxes-ctx.capex0-dNWC;
+  const amort=ctx.amortPct*ctx.loanAmount;
+  const cfads=ebitda-taxes-ctx.capex0-dNWC;
+  return {
+    coupon, proFormaInterest, totalDebt,
+    leverage: totalDebt/ebitda,
+    netLeverage: (totalDebt-ctx.cash)/ebitda,
+    coverage: ebitda/proFormaInterest,
+    dscr: cfads/(proFormaInterest+amort),
+    margin: ebitda/ctx.revenue,
+    fcf, fcfConv: fcf/ebitda,
+    liqRunway: ctx.cash/(proFormaInterest/12)   // months of interest covered by cash
+  };
+}
+
+/* =========================================================================
+   CREDIT SCORING / PD SCORECARD
+   Each metric → 0-10 risk sub-score (10 = worst). Weighted → logistic PD.
+   ========================================================================= */
+function interp(x, pts){ // pts: [[x,score],...] ascending in x; piecewise linear, clamped
+  if(x<=pts[0][0]) return pts[0][1];
+  if(x>=pts[pts.length-1][0]) return pts[pts.length-1][1];
+  for(let i=1;i<pts.length;i++) if(x<=pts[i][0]){
+    const [x0,s0]=pts[i-1],[x1,s1]=pts[i];
+    return s0+(s1-s0)*(x-x0)/(x1-x0);
+  }
+  return pts[pts.length-1][1];
+}
+function creditScore(ctx, r){
+  const sub={
+    leverage:  interp(r.leverage,  [[2,1],[3,3],[5.5,7],[8,10]]),
+    coverage:  10-interp(r.coverage,[[1,0],[1.5,3],[3,8],[5,10]]),
+    fcf:       10-interp(r.fcfConv, [[0,0],[0.2,3],[0.5,8],[0.7,10]]),
+    growth:    10-interp(ctx.histGrowth,[[-0.05,0],[0,4],[0.05,8],[0.1,10]]),
+    liquidity: interp(r.liqRunway,[[2,10],[6,7],[12,4],[24,1]]),
+    industry:  (ctx.industryRisk-1)*4.5+1,        // 1/2/3 → 1/5.5/10
+    cyclic:    (ctx.cyclicality-1)*4.5+1,
+    concentr:  (ctx.custConc-1)*4.5+1
+  };
+  if(ctx.sponsor) Object.keys(sub).forEach(()=>{}); // sponsor handled as score reduction below
+  const w={leverage:.24,coverage:.18,fcf:.12,growth:.08,liquidity:.10,industry:.12,cyclic:.08,concentr:.08};
+  let score=Object.keys(w).reduce((s,k)=>s+sub[k]*w[k],0);
+  if(ctx.sponsor) score=Math.max(0,score-0.6);     // sponsor support modestly lowers risk
+  // logistic mapping: score 0→~2%, 5→~12%, 10→~45% (5-yr PD)
+  const pd=1/(1+Math.exp(-(-3.89+0.369*score)));
+  return {sub, score, pd, weights:w};
+}
+function ratingFromPD(pd){
+  if(pd<0.01) return 'AA / A';
+  if(pd<0.025) return 'BBB';
+  if(pd<0.05) return 'BBB- / BB+';
+  if(pd<0.10) return 'BB';
+  if(pd<0.18) return 'B';
+  if(pd<0.30) return 'CCC';
+  return 'CC / C';
+}
+
+/* =========================================================================
+   READ INPUTS → context object
+   ========================================================================= */
+function readCtx(){
+  return {
+    revenue:N('revenue'), ebitda:N('ebitda'), cash:N('cash'),
+    existingDebt:N('existingDebt'), existingInterest:N('existingInterest'),
+    capex0:N('capex0'), taxRate:N('taxRate')/100, nwcPct:N('nwcPct')/100,
+    histGrowth:N('histGrowth')/100,
+    industryRisk:N('industryRisk'), cyclicality:N('cyclicality'),
+    custConc:N('custConc'), sponsor:N('sponsor')===1,
+    loanAmount:N('loanAmount'), baseRate:N('baseRate')/100, spread:N('spread')/10000,
+    maturity:Math.round(N('maturity')), amortPct:N('amortPct')/100,
+    upfrontFee:N('upfrontFee')/100, exitFee:N('exitFee')/100, pikPct:N('pikPct')/100,
+    seniority:$('seniority').value,
+    ev:N('ev'), distMult:N('distMult'), pariSenior:N('pariSenior'),
+    juniorDebt:N('juniorDebt'), preferred:N('preferred'),
+    covLev:N('covLev'), covCov:N('covCov'), covLiq:N('covLiq'), covDSCR:N('covDSCR'),
+    numSims:clamp(Math.round(N('numSims')),100,200000),
+    revVol:N('revVol')/100, marginVol:N('marginVol')/100, rateVol:N('rateVol')/100, corr:clamp(N('corr'),-0.95,0.95),
+    dtCov:N('dtCov'), dtLev:N('dtLev'), dtDSCR:N('dtDSCR'), dtCash:N('dtCash'), breachPersist:Math.round(N('breachPersist')),
+    targetIRR:N('targetIRR')/100, targetExcess:N('targetExcess')/100, liqPrem:N('liqPrem')/100, riskBuffer:N('riskBuffer')/100,
+    appPD:N('appPD')/100, appEL:N('appEL')/100, appRec:N('appRec')/100, appBreach:N('appBreach')/100,
+    cases:{
+      up:{g:N('g_up')/100, m:N('m_up')/100, cx:N('cx_up')/100, ex:N('ex_up')},
+      base:{g:N('g_base')/100, m:N('m_base')/100, cx:N('cx_base')/100, ex:N('ex_base')},
+      dn:{g:N('g_dn')/100, m:N('m_dn')/100, cx:N('cx_dn')/100, ex:N('ex_dn')}
+    }
+  };
+}
+
+/* =========================================================================
+   MAIN ORCHESTRATOR
+   ========================================================================= */
+function analyze(){
+  const ctx=readCtx();
+  const r=ratios(ctx);
+  const cs=creditScore(ctx,r);
+
+  /* --- deterministic IRR/MOIC for the three cases --- */
+  const det={};
+  for(const k of ['up','base','dn']){
+    const c=ctx.cases[k];
+    const gSeq=Array(ctx.maturity).fill(c.g);
+    const mSeq=Array(ctx.maturity).fill(c.m);
+    const rSeq=Array(ctx.maturity).fill(ctx.baseRate);
+    det[k]=runPath(ctx, gSeq, mSeq, c.cx, rSeq);
+  }
+  const baseProj=det.base;   // used for the projection + covenant tables
+
+  /* --- Monte Carlo simulation --- */
+  const base=ctx.cases.base;
+  const rho=ctx.corr, sq=Math.sqrt(1-rho*rho);
+  const irrs=[], losses=[]; let nDef=0,nBreach=0,nNeg=0, recSum=0, recCount=0;
+  for(let s=0;s<ctx.numSims;s++){
+    const gSeq=[], mSeq=[], rSeq=[];
+    for(let y=0;y<ctx.maturity;y++){
+      const z1=randn(), z2=randn(), z3=randn();
+      gSeq.push(base.g + ctx.revVol*z1);
+      mSeq.push(base.m + ctx.marginVol*(rho*z1+sq*z2));
+      rSeq.push(ctx.baseRate + ctx.rateVol*z3);
+    }
+    const p=runPath(ctx, gSeq, mSeq, base.cx, rSeq);
+    irrs.push(p.irr); losses.push(p.lossFrac);
+    if(p.defaulted){nDef++; recSum+=p.recoveryRate; recCount++;}
+    if(p.breached) nBreach++;
+    if(p.irr<0) nNeg++;
+  }
+  irrs.sort((a,b)=>a-b);
+  const mc={
+    pd:nDef/ctx.numSims,
+    breachProb:nBreach/ctx.numSims,
+    negProb:nNeg/ctx.numSims,
+    avgRecovery: recCount? recSum/recCount : null,
+    expLoss: mean(losses),
+    meanIRR: mean(irrs),
+    medIRR: percentile(irrs,0.5),
+    p5IRR: percentile(irrs,0.05),
+    p25IRR: percentile(irrs,0.25),
+    irrs
+  };
+
+  /* --- base-case / distressed waterfall snapshot --- */
+  const distressedEV = baseProj.metrics.length
+      ? baseProj.metrics[baseProj.metrics.length-1].ebitda*ctx.distMult
+      : ctx.ebitda*ctx.distMult;
+  const wfGoing = runWaterfall(ctx.ev, buildTranches(ctx));
+  const wfDistress = runWaterfall(distressedEV, buildTranches(ctx));
+
+  /* --- pricing --- */
+  const offeredSpread=ctx.spread;
+  const requiredSpread=mc.expLoss + ctx.targetExcess + ctx.liqPrem + ctx.riskBuffer;
+  const spreadGap=requiredSpread-offeredSpread;
+  const recoveryForDecision = mc.avgRecovery!=null ? mc.avgRecovery : wfDistress.loanRecovery;
+
+  /* --- decision rules --- */
+  const reject =
+      mc.pd>0.25 || mc.expLoss>0.08 || recoveryForDecision<0.40 || r.coverage<1.25;
+  const passCredit =
+      mc.pd<ctx.appPD && mc.expLoss<ctx.appEL && recoveryForDecision>ctx.appRec &&
+      mc.breachProb<ctx.appBreach && mc.meanIRR>=ctx.targetIRR;
+  let decision;
+  if(reject) decision='reject';
+  else if(passCredit && spreadGap<=0.0005) decision='approve';
+  else decision='reprice';
+
+  const recommendedSpread=Math.max(offeredSpread, requiredSpread);
+  const recommendedCoupon=ctx.baseRate+recommendedSpread;
+
+  render({ctx,r,cs,det,baseProj,mc,wfGoing,wfDistress,distressedEV,
+          offeredSpread,requiredSpread,spreadGap,recoveryForDecision,
+          decision,recommendedSpread,recommendedCoupon});
+}
+
+/* =========================================================================
+   RENDER FINAL REPORT
+   ========================================================================= */
+function cls(v,goodIf,warnIf){ // returns 'good'/'warn'/'bad' given thresholds (higher worse handled by caller)
+  return v;
+}
+function render(R){
+  const {ctx,r,cs,det,baseProj,mc,wfGoing,wfDistress,distressedEV,
+         offeredSpread,requiredSpread,spreadGap,recoveryForDecision,
+         decision,recommendedSpread,recommendedCoupon}=R;
+  const bps=x=>Math.round(x*10000);
+
+  /* recommendation banner text */
+  let decLabel, decClass, why, changes=[];
+  if(decision==='approve'){
+    decLabel='APPROVE'; decClass='rec-approve';
+    why=`Credit risk and pricing both clear committee thresholds. Default probability of ${fmtP(mc.pd)} and expected loss of ${fmtP(mc.expLoss)} are within limits, downside recovery of ${fmtP(recoveryForDecision)} is protective, and the offered spread of ${bps(offeredSpread)} bps compensates for the risk.`;
+  }else if(decision==='reprice'){
+    decLabel='APPROVE WITH CHANGES · REPRICE'; decClass='rec-reprice';
+    why=`Credit quality is acceptable, but the current spread of ${bps(offeredSpread)} bps does not fully compensate for expected loss, downside volatility, and covenant-breach risk. Reprice to clear the hurdle and tighten protections.`;
+    if(spreadGap>0.0005) changes.push(`Increase spread from base + ${bps(offeredSpread)} bps to base + ${bps(recommendedSpread)} bps (+${bps(spreadGap)} bps).`);
+    changes.push(`Add minimum-liquidity covenant of ${fmt$(Math.max(ctx.covLiq,12))}.`);
+    changes.push(`Tighten maximum-leverage covenant to ${(Math.max(2,r.leverage)+0.25).toFixed(2)}x.`);
+    changes.push('Require quarterly financial reporting and lender information rights.');
+  }else{
+    decLabel='REJECT'; decClass='rec-reject';
+    const reasons=[];
+    if(mc.pd>0.25) reasons.push(`PD ${fmtP(mc.pd)} > 25%`);
+    if(mc.expLoss>0.08) reasons.push(`expected loss ${fmtP(mc.expLoss)} > 8%`);
+    if(recoveryForDecision<0.40) reasons.push(`recovery ${fmtP(recoveryForDecision)} < 40%`);
+    if(r.coverage<1.25) reasons.push(`interest coverage ${fmtX(r.coverage)} < 1.25x`);
+    why=`Risk exceeds hard limits: ${reasons.join('; ')}. The structure does not offer adequate downside protection at any reasonable spread.`;
+  }
+
+  const irrCl = mc.meanIRR>=ctx.targetIRR?'good':(mc.meanIRR>=ctx.targetIRR-0.02?'warn':'bad');
+  const pdCl  = mc.pd<ctx.appPD?'good':(mc.pd<0.25?'warn':'bad');
+  const elCl  = mc.expLoss<ctx.appEL?'good':(mc.expLoss<0.08?'warn':'bad');
+  const recCl = recoveryForDecision>ctx.appRec?'good':(recoveryForDecision>0.40?'warn':'bad');
+  const brCl  = mc.breachProb<ctx.appBreach?'good':'warn';
+
+  /* strengths / weaknesses from scorecard */
+  const subArr=Object.entries(cs.sub).sort((a,b)=>b[1]-a[1]);
+  const labelMap={leverage:'Leverage',coverage:'Interest coverage',fcf:'FCF conversion',growth:'Revenue growth',liquidity:'Liquidity runway',industry:'Industry risk',cyclic:'Cyclicality',concentr:'Customer concentration'};
+  const weaknesses=subArr.slice(0,3).map(([k,v])=>`<li><b>${labelMap[k]}</b> — risk score ${v.toFixed(1)}/10</li>`).join('');
+  const strengths=subArr.slice(-3).reverse().map(([k,v])=>`<li><b>${labelMap[k]}</b> — risk score ${v.toFixed(1)}/10</li>`).join('');
+
+  /* projection table (base case) */
+  let projRows=`<tr><td>0</td><td>${ctx.revenue.toFixed(0)}</td><td>${ctx.ebitda.toFixed(1)}</td><td>${r.proFormaInterest.toFixed(1)}</td><td>${ctx.capex0.toFixed(1)}</td><td>—</td><td>${(ctx.existingDebt+ctx.loanAmount).toFixed(0)}</td><td>${fmtX(r.leverage)}</td><td>${fmtX(r.coverage)}</td></tr>`;
+  baseProj.metrics.forEach(m=>{
+    projRows+=`<tr><td>${m.y}</td><td>${m.rev.toFixed(0)}</td><td>${m.ebitda.toFixed(1)}</td><td>${m.interest.toFixed(1)}</td><td>${m.capex.toFixed(1)}</td><td>${m.fcf.toFixed(1)}</td><td>${m.totalDebt.toFixed(0)}</td><td>${fmtX(m.lev)}</td><td>${fmtX(m.cov)}</td></tr>`;
+  });
+
+  /* covenant table (base case) */
+  let covRows='';
+  baseProj.metrics.forEach(m=>{
+    const checks=[
+      {n:'Max leverage',v:m.lev,lim:ctx.covLev,bad:m.lev>ctx.covLev,fmt:fmtX},
+      {n:'Min coverage',v:m.cov,lim:ctx.covCov,bad:m.cov<ctx.covCov,fmt:fmtX},
+      {n:'Min liquidity',v:m.cash,lim:ctx.covLiq,bad:m.cash<ctx.covLiq,fmt:fmt$},
+      {n:'Min DSCR',v:m.dscr,lim:ctx.covDSCR,bad:m.dscr<ctx.covDSCR,fmt:fmtX}
+    ];
+    const anyBreach=checks.some(c=>c.bad);
+    covRows+=`<tr><td>Year ${m.y}</td><td>${fmtX(m.lev)}</td><td>${fmtX(m.cov)}</td><td>${fmt$(m.cash)}</td><td>${fmtX(m.dscr)}</td><td>${anyBreach?'<span class="tag no">Breach</span>':'<span class="tag ok">Pass</span>'}</td></tr>`;
+  });
+
+  /* waterfall table (distressed) */
+  let wfRows='';
+  wfDistress.rows.forEach(t=>{
+    wfRows+=`<tr><td>${t.name}${t.isLoan?' ◀':''}</td><td>${fmt$(t.amount)}</td><td>${fmt$(t.paid)}</td><td>${fmtP(t.rec,0)}</td></tr>`;
+  });
+  wfRows+=`<tr><td>Residual equity</td><td>—</td><td>${fmt$(wfDistress.residualEquity)}</td><td>—</td></tr>`;
+
+  const html=`
+  <div class="recbanner ${decClass}">
+    <div class="dec">Recommendation: ${decLabel}</div>
+    <div class="why">${why}</div>
+    ${changes.length?`<ul class="clean" style="margin-top:12px">${changes.map(c=>`<li>${c}</li>`).join('')}</ul>`:''}
+    <div class="flow">
+      ${['Normalize','Ratios','Credit score','Project','Simulate','Detect default','Recover','IRR/MOIC','Price','Recommend'].map(s=>`<span class="step done">${s}</span>`).join('')}
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="k">Base-case IRR</div><div class="v ${det.base.irr>=ctx.targetIRR?'good':'warn'}">${fmtP(det.base.irr)}</div><div class="s">MOIC ${fmtX(det.base.moic)}</div></div>
+    <div class="card"><div class="k">Expected (sim) IRR</div><div class="v ${irrCl}">${fmtP(mc.meanIRR)}</div><div class="s">median ${fmtP(mc.medIRR)}</div></div>
+    <div class="card"><div class="k">5th-pct IRR</div><div class="v ${mc.p5IRR<0?'bad':'warn'}">${fmtP(mc.p5IRR)}</div><div class="s">downside tail</div></div>
+    <div class="card"><div class="k">Prob. of default</div><div class="v ${pdCl}">${fmtP(mc.pd)}</div><div class="s">scorecard ${fmtP(cs.pd)}</div></div>
+    <div class="card"><div class="k">Expected loss</div><div class="v ${elCl}">${fmtP(mc.expLoss)}</div><div class="s">of principal</div></div>
+    <div class="card"><div class="k">Covenant breach prob.</div><div class="v ${brCl}">${fmtP(mc.breachProb)}</div><div class="s">over loan life</div></div>
+    <div class="card"><div class="k">Downside recovery</div><div class="v ${recCl}">${mc.avgRecovery!=null?fmtP(mc.avgRecovery,0):fmtP(wfDistress.loanRecovery,0)}</div><div class="s">if default</div></div>
+    <div class="card"><div class="k">Prob. negative return</div><div class="v ${mc.negProb<0.1?'good':'warn'}">${fmtP(mc.negProb)}</div><div class="s">${ctx.numSims.toLocaleString()} paths</div></div>
+  </div>
+
+  <section class="block">
+    <h2>Loan pricing</h2>
+    <div class="desc">Required spread = expected loss + target excess return + liquidity premium + risk buffer.</div>
+    <div class="twocol">
+      <table>
+        <tr><th>Component</th><th>Contribution</th></tr>
+        <tr><td>Expected loss</td><td>${bps(mc.expLoss)} bps</td></tr>
+        <tr><td>Target excess return</td><td>${bps(ctx.targetExcess)} bps</td></tr>
+        <tr><td>Liquidity premium</td><td>${bps(ctx.liqPrem)} bps</td></tr>
+        <tr><td>Risk buffer</td><td>${bps(ctx.riskBuffer)} bps</td></tr>
+        <tr><td><b>Required spread</b></td><td><b>${bps(requiredSpread)} bps</b></td></tr>
+      </table>
+      <table>
+        <tr><th>Pricing verdict</th><th></th></tr>
+        <tr><td>Offered spread</td><td>${bps(offeredSpread)} bps</td></tr>
+        <tr><td>Required spread</td><td>${bps(requiredSpread)} bps</td></tr>
+        <tr><td>Spread gap</td><td><span class="tag ${spreadGap>0.0005?'no':'ok'}">${spreadGap>0?'+':''}${bps(spreadGap)} bps</span></td></tr>
+        <tr><td>All-in coupon (offered)</td><td>${fmtP(r.coupon)}</td></tr>
+        <tr><td><b>Recommended coupon</b></td><td><b>base + ${bps(recommendedSpread)} = ${fmtP(recommendedCoupon)}</b></td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>IRR distribution · Monte Carlo</h2>
+    <div class="desc">${ctx.numSims.toLocaleString()} simulated borrower futures. Each path projects operations, tests covenants &amp; default triggers, computes recovery via the waterfall, and discounts the lender's realized cash flows.</div>
+    <canvas id="hist" width="900" height="260"></canvas>
+    <div class="legend">
+      <span><b style="background:var(--bad)"></b>P5 ${fmtP(mc.p5IRR)}</span>
+      <span><b style="background:var(--accent2)"></b>Median ${fmtP(mc.medIRR)}</span>
+      <span><b style="background:var(--accent)"></b>Mean ${fmtP(mc.meanIRR)}</span>
+      <span><b style="background:var(--muted)"></b>Hurdle ${fmtP(ctx.targetIRR)}</span>
+    </div>
+  </section>
+
+  <div class="twocol">
+    <section class="block">
+      <h2>Credit metrics</h2>
+      <div class="desc">Pro-forma at close, including the proposed loan.</div>
+      <table>
+        <tr><td>Total debt / EBITDA</td><td>${fmtX(r.leverage)}</td></tr>
+        <tr><td>Net leverage</td><td>${fmtX(r.netLeverage)}</td></tr>
+        <tr><td>Interest coverage</td><td>${fmtX(r.coverage)}</td></tr>
+        <tr><td>DSCR</td><td>${fmtX(r.dscr)}</td></tr>
+        <tr><td>EBITDA margin</td><td>${fmtP(r.margin)}</td></tr>
+        <tr><td>FCF conversion</td><td>${fmtP(r.fcfConv)}</td></tr>
+        <tr><td>All-in coupon</td><td>${fmtP(r.coupon)}</td></tr>
+        <tr><td>Pro-forma interest</td><td>${fmt$(r.proFormaInterest)}</td></tr>
+      </table>
+    </section>
+    <section class="block">
+      <h2>Credit score &amp; rating</h2>
+      <div class="desc">Weighted scorecard → implied 5-yr PD &amp; rating.</div>
+      <table>
+        <tr><td>Composite risk score</td><td>${cs.score.toFixed(1)} / 10</td></tr>
+        <tr><td>Scorecard 5-yr PD</td><td>${fmtP(cs.pd)}</td></tr>
+        <tr><td>Implied rating</td><td><span class="pill">${ratingFromPD(cs.pd)}</span></td></tr>
+      </table>
+      <div class="twocol" style="margin-top:14px;gap:14px">
+        <div><div class="k" style="font-size:11px;color:var(--bad);text-transform:uppercase;letter-spacing:.6px">Top weaknesses</div><ul class="clean">${weaknesses}</ul></div>
+        <div><div class="k" style="font-size:11px;color:var(--good);text-transform:uppercase;letter-spacing:.6px">Top strengths</div><ul class="clean">${strengths}</ul></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="block">
+    <h2>Financial projection (base case, $M)</h2>
+    <div class="desc">Projected over the ${ctx.maturity}-year loan life with annual credit-metric recalculation.</div>
+    <table>
+      <tr><th>Year</th><th>Revenue</th><th>EBITDA</th><th>Interest</th><th>Capex</th><th>FCF</th><th>Debt</th><th>Lev</th><th>Cov</th></tr>
+      ${projRows}
+    </table>
+  </section>
+
+  <div class="twocol">
+    <section class="block">
+      <h2>Covenant analysis</h2>
+      <div class="desc">Base-case test vs thresholds (Lev≤${ctx.covLev}x, Cov≥${ctx.covCov}x, Liq≥${fmt$(ctx.covLiq)}, DSCR≥${ctx.covDSCR}x).</div>
+      <table>
+        <tr><th>Period</th><th>Lev</th><th>Cov</th><th>Cash</th><th>DSCR</th><th>Status</th></tr>
+        ${covRows}
+      </table>
+      <div class="note">Simulated breach probability across all paths: ${fmtP(mc.breachProb)}.</div>
+    </section>
+    <section class="block">
+      <h2>Deterministic returns</h2>
+      <div class="desc">Lender IRR / MOIC by scenario.</div>
+      <table>
+        <tr><th>Scenario</th><th>IRR</th><th>MOIC</th><th>Outcome</th></tr>
+        <tr><td>Upside</td><td>${fmtP(det.up.irr)}</td><td>${fmtX(det.up.moic)}</td><td>${det.up.defaulted?`<span class="tag no">Default Y${det.up.defaultYear}</span>`:'<span class="tag ok">Repaid</span>'}</td></tr>
+        <tr><td>Base</td><td>${fmtP(det.base.irr)}</td><td>${fmtX(det.base.moic)}</td><td>${det.base.defaulted?`<span class="tag no">Default Y${det.base.defaultYear}</span>`:'<span class="tag ok">Repaid</span>'}</td></tr>
+        <tr><td>Downside</td><td>${fmtP(det.dn.irr)}</td><td>${fmtX(det.dn.moic)}</td><td>${det.dn.defaulted?`<span class="tag no">Default Y${det.dn.defaultYear}</span>`:'<span class="tag ok">Repaid</span>'}</td></tr>
+      </table>
+    </section>
+  </div>
+
+  <section class="block">
+    <h2>Capital structure waterfall (distressed)</h2>
+    <div class="desc">Distressed enterprise value ${fmt$(distressedEV)} (= terminal EBITDA × ${ctx.distMult}x) distributed by priority. The proposed loan (◀) sits in the ${ctx.seniority==='first'?'first-lien':'second-lien'} class. Going-concern EV of ${fmt$(ctx.ev)} would fully cover all debt.</div>
+    <table>
+      <tr><th>Tranche</th><th>Claim</th><th>Recovered</th><th>Recovery %</th></tr>
+      ${wfRows}
+    </table>
+    <div class="note">Proposed-loan recovery in this distressed snapshot: <b>${fmtP(wfDistress.loanRecovery,0)}</b>. Average simulated recovery across defaulting paths: <b>${mc.avgRecovery!=null?fmtP(mc.avgRecovery,0):'n/a (no defaults)'}</b>.</div>
+  </section>
+
+  <section class="block">
+    <h2>Investment committee summary</h2>
+    <table>
+      <tr><td>Borrower</td><td>Rev ${fmt$(ctx.revenue)}, EBITDA ${fmt$(ctx.ebitda)} (${fmtP(r.margin)} margin)</td></tr>
+      <tr><td>Proposed loan</td><td>${fmt$(ctx.loanAmount)} ${ctx.seniority==='first'?'senior secured (1st lien)':'second lien'}, ${ctx.maturity}y, base + ${bps(offeredSpread)} bps</td></tr>
+      <tr><td>Pro-forma leverage</td><td>${fmtX(r.leverage)} (net ${fmtX(r.netLeverage)})</td></tr>
+      <tr><td>Probability of default</td><td>${fmtP(mc.pd)}</td></tr>
+      <tr><td>Expected loss</td><td>${fmtP(mc.expLoss)}</td></tr>
+      <tr><td>Base / sim IRR</td><td>${fmtP(det.base.irr)} / ${fmtP(mc.meanIRR)}</td></tr>
+      <tr><td>Downside (P5) IRR</td><td>${fmtP(mc.p5IRR)}</td></tr>
+      <tr><td>Downside recovery</td><td>${mc.avgRecovery!=null?fmtP(mc.avgRecovery,0):fmtP(wfDistress.loanRecovery,0)}</td></tr>
+      <tr><td>Pricing</td><td>offered ${bps(offeredSpread)} bps vs required ${bps(requiredSpread)} bps</td></tr>
+      <tr><td><b>Decision</b></td><td><b>${decLabel}</b> — recommended coupon base + ${bps(recommendedSpread)} bps = ${fmtP(recommendedCoupon)}</td></tr>
+    </table>
+    <div class="note">This tool is a quantitative decision-support model, not investment advice. Outputs depend entirely on the assumptions entered; stress the volatility, recovery, and default-trigger inputs before relying on any result.</div>
+  </section>
+  `;
+  $('results').innerHTML=html;
+  drawHist(mc, ctx);
+}
+
+/* histogram on canvas */
+function drawHist(mc, ctx){
+  const cv=$('hist'); if(!cv) return;
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth, H=260;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const g=cv.getContext('2d'); g.scale(dpr,dpr);
+  g.clearRect(0,0,W,H);
+  const data=mc.irrs;
+  let lo=percentile(data,0.01), hi=percentile(data,0.99);
+  lo=Math.min(lo,-0.05); hi=Math.max(hi,ctx.targetIRR+0.05);
+  const bins=48, counts=new Array(bins).fill(0);
+  data.forEach(v=>{ let b=Math.floor((v-lo)/(hi-lo)*bins); b=clamp(b,0,bins-1); counts[b]++; });
+  const maxC=Math.max(...counts);
+  const padB=26, padL=8, padR=8, plotH=H-padB-8, plotW=W-padL-padR;
+  const xOf=v=>padL+ (v-lo)/(hi-lo)*plotW;
+  // bars
+  for(let i=0;i<bins;i++){
+    const x=padL+i/bins*plotW, w=plotW/bins-1;
+    const h=counts[i]/maxC*plotH;
+    const binMid=lo+(i+0.5)/bins*(hi-lo);
+    g.fillStyle = binMid<0 ? 'rgba(229,87,95,.75)' : (binMid<ctx.targetIRR? 'rgba(232,177,58,.7)':'rgba(54,194,168,.8)');
+    g.fillRect(x, H-padB-h, w, h);
+  }
+  // markers
+  const marker=(v,color,label)=>{
+    const x=clamp(xOf(v),padL,W-padR);
+    g.strokeStyle=color; g.lineWidth=1.5; g.setLineDash([4,3]);
+    g.beginPath(); g.moveTo(x,8); g.lineTo(x,H-padB); g.stroke(); g.setLineDash([]);
+  };
+  marker(0,'rgba(229,87,95,.9)');
+  marker(ctx.targetIRR,'rgba(138,153,173,.9)');
+  marker(mc.medIRR,'rgba(79,140,255,.95)');
+  marker(mc.meanIRR,'rgba(54,194,168,1)');
+  // axis labels
+  g.fillStyle='#8a99ad'; g.font='11px -apple-system,sans-serif'; g.textAlign='center';
+  for(let t=0;t<=5;t++){
+    const v=lo+(hi-lo)*t/5;
+    g.fillText((v*100).toFixed(0)+'%', padL+t/5*plotW, H-9);
+  }
+}
+
+/* =========================================================================
+   UI WIRING
+   ========================================================================= */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tabpane').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelector(`.tabpane[data-pane="${t.dataset.tab}"]`).classList.add('active');
+  });
+});
+$('runBtn').addEventListener('click',()=>{ try{ analyze(); }catch(e){ $('results').innerHTML='<section class="block"><h2 style="color:var(--bad)">Error</h2><div class="desc">'+e.message+'</div></section>'; console.error(e);} });
+const defaults={};
+document.querySelectorAll('input,select').forEach(el=> defaults[el.id]=el.value);
+$('resetBtn').addEventListener('click',()=>{ for(const id in defaults) $(id).value=defaults[id]; updateDerived(); analyze(); });
+window.addEventListener('resize',()=>{ /* redraw handled on next run */ });
+
+/* Keep the read-only computed displays in sync with the genuine user inputs.
+   These values are derived (coupon, capital stack, residual equity) and are
+   shown for reference only — never typed by the user. */
+function updateDerived(){
+  const base=N('baseRate'), spreadBps=N('spread'), spreadPct=spreadBps/100;
+  const coupon=base+spreadPct, loan=N('loanAmount'), upf=N('upfrontFee');
+  $('dispCoupon').textContent    = coupon.toFixed(2)+'%';
+  $('dispSpread').textContent    = spreadBps.toFixed(0)+' bps ('+spreadPct.toFixed(2)+'%)';
+  $('dispNetFunded').textContent = fmt$(loan*(1-upf/100));
+
+  const seniority=$('seniority').value;
+  const pari=N('pariSenior'), jr=N('juniorDebt'), pref=N('preferred'), ev=N('ev');
+  const rows=[['Enterprise value (going concern)', fmt$(ev), '']];
+  if(seniority==='first'){
+    rows.push(['First lien — incl. proposed loan', fmt$(pari+loan), 'loanrow', 'proposed '+fmt$(loan)]);
+  }else{
+    if(pari>0) rows.push(['First lien (existing senior)', fmt$(pari), '']);
+    rows.push(['Second lien — proposed loan', fmt$(loan), 'loanrow']);
+  }
+  rows.push(['Junior / subordinated debt', fmt$(jr), '']);
+  rows.push(['Preferred equity', fmt$(pref), '']);
+  rows.push(['Common equity (residual)', fmt$(Math.max(0, ev-(pari+loan+jr)-pref)), 'eqrow']);
+  rows.push(['Value beneath proposed loan (cushion)', fmt$(Math.max(0, ev-(pari+loan))), 'cushrow']);
+  $('cstackTbl').innerHTML = rows.map(r=>{
+    const cls=r[2]?` class="${r[2]}"`:'';
+    const sub=r[3]?` <span style="color:#5d6b7e">· ${r[3]}</span>`:'';
+    return `<tr${cls}><td>${r[0]}${sub}</td><td>${r[1]}</td></tr>`;
+  }).join('');
+}
+document.querySelectorAll('.inputs input, .inputs select').forEach(el=>{
+  el.addEventListener('input', updateDerived);
+  el.addEventListener('change', updateDerived);
+});
+
+updateDerived();
+analyze();   // run once on load so results are visible immediately
+</script>
+</body>
+</html>
